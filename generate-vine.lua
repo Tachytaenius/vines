@@ -41,99 +41,105 @@ local function getProbabilityTime(chancePerTime, time)
 end
 
 local function generateVine(parameters)
-	local position = vec2.clone(parameters.startPosition)
-	local velocity = vec2.clone(parameters.startVelocity)
-	local acceleration = vec2.clone(parameters.startAcceleration)
-	local thickness = parameters.startThickness
-	local thicknessChange = 0 -- Don't care value, gets changed immediately,
-	local thicknessChangeTimer = 0 -- because this is zero
-	local time = 0
-	local newAccelTimer = parameters.newAccelTimerLengthBase + love.math.random() * parameters.newAccelTimerLengthVariation
-	local vertices = {}
+	local vine = {
+		position = vec2.clone(parameters.startPosition),
+		velocity = vec2.clone(parameters.startVelocity),
+		acceleration = vec2.clone(parameters.startAcceleration),
+		thickness = parameters.startThickness,
+		thicknessChange = 0, -- Don't care value, gets changed immediately,
+		thicknessChangeTimer = 0, -- because this is zero
+		time = 0,
+		newAccelTimer = parameters.newAccelTimerLengthBase + love.math.random() * parameters.newAccelTimerLengthVariation,
+		vertices = {}
+	}
+	for k, v in pairs(parameters) do
+		assert(not vine[k])
+		vine[k] = v
+	end
 
-	while time < parameters.timeLimit do
+	function vine.step(vine, dt)
 		-- Alter thickness
-		thicknessChangeTimer = thicknessChangeTimer - parameters.timeStep
-		if thicknessChangeTimer <= 0 then
-			thicknessChangeTimer = parameters.newThicknessChangeTimerLengthBase + love.math.random() * parameters.newThicknessChangeTimerLengthVariation
-			thicknessChange = (love.math.random() * 2 - 1) * parameters.maxThicknessChangeMagnitude
+		vine.thicknessChangeTimer = vine.thicknessChangeTimer - dt
+		if vine.thicknessChangeTimer <= 0 then
+			vine.thicknessChangeTimer = vine.newThicknessChangeTimerLengthBase + love.math.random() * vine.newThicknessChangeTimerLengthVariation
+			vine.thicknessChange = (love.math.random() * 2 - 1) * vine.maxThicknessChangeMagnitude
 		end
-		thickness = math.max(parameters.minimumThickness, math.min(parameters.maximumThickness, thickness + thicknessChange * parameters.timeStep))
+		vine.thickness = math.max(vine.minimumThickness, math.min(vine.maximumThickness, vine.thickness + vine.thicknessChange * dt))
 
 		-- Get tapering effect, which affects effective thickness
-		local tapering = math.min(
-			1 - calculateFogFactor2(time, parameters.taperTime),
-			1 - calculateFogFactor(time, parameters.timeLimit, parameters.taperTime)
-		)
-		local effectiveThickness = thickness * tapering
+		-- local tapering = math.min(
+		-- 	1 - calculateFogFactor2(vine.time, vine.taperTime),
+		-- 	1 - calculateFogFactor(vine.time, vine.timeLimit, vine.taperTime)
+		-- )
+		local tapering = 1
+		local effectiveThickness = vine.thickness * tapering
 
 		-- Make leaves
 		local function newLeaf(side)
 			local ret = {
 				relativeAngle = tau / 4 * side,
 				fatness = 3.5,
-				scale = ((effectiveThickness - parameters.minimumThickness) / parameters.maximumThickness + 1) * 10 -- TEMP magic numbers
+				scale = ((effectiveThickness - vine.minimumThickness) / vine.maximumThickness + 1) * 10 -- TEMP magic numbers
 			}
 			return ret
 		end
 		local leaves = {}
-		if love.math.random() < getProbabilityTime(parameters.leafProbabilityPerTime * tapering, parameters.timeStep) then
+		if love.math.random() < getProbabilityTime(vine.leafProbabilityPerTime * tapering, dt) then
 			leaves[#leaves + 1] = newLeaf(1)
 		end
-		if love.math.random() < getProbabilityTime(parameters.leafProbabilityPerTime * tapering, parameters.timeStep) then
+		if love.math.random() < getProbabilityTime(vine.leafProbabilityPerTime * tapering, dt) then
 			leaves[#leaves + 1] = newLeaf(-1)
 		end
 
 		-- Make flowers
 		local flowers = {}
-		if love.math.random() < getProbabilityTime(parameters.flowerProbabilityPerTime * tapering, parameters.timeStep) then
+		if love.math.random() < getProbabilityTime(vine.flowerProbabilityPerTime * tapering, dt) then
 			flowers[#flowers + 1] = {
-				radius = parameters.minimumFlowerRadius + love.math.random() * (parameters.maximumFlowerRadius - parameters.minimumFlowerRadius),
-				centreRadius = parameters.minimumFlowerCentreRadius + love.math.random() * (parameters.maximumFlowerCentreRadius - parameters.minimumFlowerCentreRadius),
+				radius = vine.minimumFlowerRadius + love.math.random() * (vine.maximumFlowerRadius - vine.minimumFlowerRadius),
+				centreRadius = vine.minimumFlowerCentreRadius + love.math.random() * (vine.maximumFlowerCentreRadius - vine.minimumFlowerCentreRadius),
 				angle = love.math.random() * tau,
-				colour = shallowClone(parameters.flowerColour),
-				centreColour = shallowClone(parameters.flowerCentreColour),
-				n = love.math.random(parameters.minimumFlowerN, parameters.maximumFlowerN)
+				colour = shallowClone(vine.flowerColour),
+				centreColour = shallowClone(vine.flowerCentreColour),
+				n = love.math.random(vine.minimumFlowerN, vine.maximumFlowerN),
+				p = love.math.random(vine.minimumFlowerP, vine.maximumFlowerP)
 			}
 		end
 
 		-- Lay down next point
-		vertices[#vertices + 1] = {
+		vine.vertices[#vine.vertices + 1] = {
 			thickness = effectiveThickness,
-			position = vec2.clone(position),
-			colour = shallowClone(parameters.colour),
+			position = vec2.clone(vine.position),
+			colour = shallowClone(vine.colour),
 			leaves = leaves,
 			flowers = flowers
 		}
 
 		-- Control acceleration
-		newAccelTimer = newAccelTimer - parameters.timeStep
-		if newAccelTimer <= 0 then
-			newAccelTimer = parameters.newAccelTimerLengthBase + love.math.random() * parameters.newAccelTimerLengthVariation
-			acceleration = randCircle(parameters.maxAcceleration)
+		vine.newAccelTimer = vine.newAccelTimer - dt
+		if vine.newAccelTimer <= 0 then
+			vine.newAccelTimer = vine.newAccelTimerLengthBase + love.math.random() * vine.newAccelTimerLengthVariation
+			vine.acceleration = randCircle(vine.maxAcceleration)
 		end
 
 		-- Control velocity
-		if velocity == vec2() and acceleration == vec2() then
+		if vine.velocity == vec2() and vine.acceleration == vec2() then
 			-- Since the vine won't be moving, give it a random push
-			velocity = vec2.fromAngle(love.math.random() * tau) * parameters.startAcceleration * parameters.timeStep
+			vine.velocity = vec2.fromAngle(love.math.random() * tau) * vine.startAcceleration * dt
 		end
-		if #velocity < parameters.minimumSpeed then
-			velocity = normaliseOrZero(velocity) * parameters.minimumSpeed
+		if #vine.velocity < vine.minimumSpeed then
+			vine.velocity = normaliseOrZero(vine.velocity) * vine.minimumSpeed
 		end
-		if #velocity > parameters.maximumSpeed then
-			velocity = vec2.normalise(velocity) * parameters.maximumSpeed
+		if #vine.velocity > vine.maximumSpeed then
+			vine.velocity = vec2.normalise(vine.velocity) * vine.maximumSpeed
 		end
-		velocity = velocity + acceleration * parameters.timeStep
+		vine.velocity = vine.velocity + vine.acceleration * dt
 
 		-- Step forwards
-		position = position + velocity * parameters.timeStep
-		time = time + parameters.timeStep
+		vine.position = vine.position + vine.velocity * dt
+		vine.time = vine.time + dt
 	end
 
-	return {
-		vertices = vertices
-	}
+	return vine
 end
 
 return generateVine

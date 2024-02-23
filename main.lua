@@ -26,16 +26,16 @@ function love.load()
 	flowerShader = love.graphics.newShader("shaders/flower.glsl")
 
 	vines = {}
-	for _=1, 30 do
+	for _=1, 50 do
 		vines[#vines + 1] = generateVine({
 			startPosition = vec2(
-				love.math.random() * 2 - 0.5,
-				love.math.random() * 2 - 0.5
+				love.math.random() * 1.5 - 0.25,
+				love.math.random() * 1.5 - 0.25
 			) * vec2(love.graphics.getDimensions()),
 			startVelocity = vec2.fromAngle(love.math.random() * tau) * 40,
-			startAcceleration = vec2(),
-			minimumSpeed = 20,
-			maximumSpeed = 25,
+			startAcceleration = vec2.fromAngle(love.math.random() * tau) * 40,
+			minimumSpeed = 60,
+			maximumSpeed = 80,
 			timeStep = 0.125,
 			timeLimit = 40 + love.math.random() * 10,
 			initialAcceleration = 3,
@@ -44,12 +44,12 @@ function love.load()
 			flowerCentreColour = {1, 1, 1},
 			newAccelTimerLengthBase = 3,
 			newAccelTimerLengthVariation = 1,
-			maxAcceleration = 7,
+			maxAcceleration = 40,
 			startThickness = 3,
 			minimumThickness = 3, -- Ignoring tapering
 			maximumThickness = 5,
-			leafProbabilityPerTime = 0.25,
-			flowerProbabilityPerTime = 0.1,
+			leafProbabilityPerTime = 0.5,
+			flowerProbabilityPerTime = 0.25,
 			taperTime = 1,
 			newThicknessChangeTimerLengthBase = 3,
 			newThicknessChangeTimerLengthVariation = 1,
@@ -59,9 +59,17 @@ function love.load()
 			minimumFlowerCentreRadius = 2,
 			maximumFlowerCentreRadius = 3,
 			minimumFlowerN = 4,
-			maximumFlowerN = 7
+			maximumFlowerN = 7,
+			minimumFlowerP = 0,
+			maximumFlowerP = 4
 			-- add branching
 		})
+	end
+end
+
+function love.update(dt)
+	for _, vine in ipairs(vines) do
+		vine.step(vine, dt)
 	end
 end
 
@@ -86,10 +94,12 @@ function love.draw()
 				-- Specially handle leaves on ends
 				if i == 1 then
 					local nextVertex = vine.vertices[i + 1]
-					normal = vec2.rotate(vec2.normalise(nextVertex.position - vertex.position), sign(leaf.relativeAngle) * (math.abs(leaf.relativeAngle) + tau / 8))
+					-- normal = vec2.rotate(vec2.normalise(nextVertex.position - vertex.position), sign(leaf.relativeAngle) * (math.abs(leaf.relativeAngle) + tau / 8))
+					normal = vec2.rotate(vec2.normalise(nextVertex.position - vertex.position), sign(leaf.relativeAngle) * (math.abs(leaf.relativeAngle)))
 				elseif i == #vine.vertices then
 					local previousVertex = vine.vertices[i - 1]
-					normal = vec2.rotate(vec2.normalise(vertex.position - previousVertex.position), sign(leaf.relativeAngle) * (math.abs(leaf.relativeAngle) - tau / 8))
+					-- normal = vec2.rotate(vec2.normalise(vertex.position - previousVertex.position), sign(leaf.relativeAngle) * (math.abs(leaf.relativeAngle) - tau / 8))
+					normal = vec2.rotate(vec2.normalise(vertex.position - previousVertex.position), sign(leaf.relativeAngle) * (math.abs(leaf.relativeAngle)))
 				else
 					local nextVertex = vine.vertices[i + 1]
 					normal = vec2.rotate(vec2.normalise(nextVertex.position - vertex.position), leaf.relativeAngle)
@@ -105,6 +115,7 @@ function love.draw()
 				love.graphics.setShader(flowerShader)
 				love.graphics.setColor(flower.colour)
 				flowerShader:send("n", flower.n)
+				flowerShader:send("p", flower.p)
 				love.graphics.draw(dummyTexture, vertex.position.x, vertex.position.y, flower.angle, flower.radius * 2, flower.radius * 2, 0.5, 0.5)
 				love.graphics.setShader()
 				love.graphics.setColor(flower.centreColour)
